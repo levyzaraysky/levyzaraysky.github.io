@@ -1,8 +1,10 @@
 // Firebase SDK Imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+// IMPORTANT: REPLACE THIS firebaseConfig WITH YOUR ACTUAL PROJECT'S CONFIGURATION
+// You can find this in your Firebase Console -> Project settings -> Your apps -> Firebase SDK snippet (Config)
 const firebaseConfig = {
     apiKey: "AIzaSyDvLVp7V3J6DqKx1I2NdOnOX5XAQFJ72Dc",
     authDomain: "tutorialgroupfinder.firebaseapp.com",
@@ -55,7 +57,9 @@ async function initializeFirebase() {
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
+        console.log("Firebase App initialized:", app); // Debugging log
         console.log("Firebase Auth initialized:", auth); // Debugging log
+        console.log("Firestore DB initialized:", db); // Debugging log
 
         // Listen for authentication state changes
         onAuthStateChanged(auth, async (user) => {
@@ -103,7 +107,7 @@ async function initializeFirebase() {
 
     } catch (error) {
         console.error("Error initializing Firebase:", error);
-        showModal("Initialization Error", "Failed to initialize the application. Please check your console for details.");
+        showModal("Initialization Error", "Failed to initialize the application. Please ensure your Firebase config is correct and your project is set up.");
     }
 }
 
@@ -132,6 +136,8 @@ googleSignInButton.addEventListener('click', async () => {
             errorMessage = "Another sign-in popup was already open. Please complete or close it.";
         } else if (error.code === 'auth/network-request-failed') {
             errorMessage = "Network error during sign-in. Check your internet connection.";
+        } else if (error.code === 'auth/operation-not-allowed') {
+            errorMessage = "Google Sign-In is not enabled for this Firebase project. Please enable it in Firebase Console -> Authentication -> Sign-in method.";
         }
         showModal("Google Sign-In Error", errorMessage);
     }
@@ -179,7 +185,7 @@ function setupRealtimeGroupListener() {
         }
     }, (error) => {
         console.error("Error fetching study groups:", error);
-        showModal("Data Fetch Error", "Failed to load study groups. Please try again later.");
+        showModal("Data Fetch Error", "Failed to load study groups. Please try again later. Check Firestore rules.");
     });
 }
 
@@ -191,28 +197,62 @@ function setupRealtimeGroupListener() {
 function createGroupCard(group, groupId) {
     const groupCard = document.createElement('div');
     groupCard.className = 'bg-white p-5 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between space-y-3 md:space-y-0 md:space-x-4';
+
+    let actionButtonHtml = '';
+    let postedByText = '';
+
+    console.log(`Rendering group: ${group.name}`); // Debugging log
+    console.log(`  Current userId: ${userId}`); // Debugging log
+    console.log(`  Group createdBy: ${group.createdBy}`); // Debugging log
+    console.log(`  Is creator? ${userId && group.createdBy === userId}`); // Debugging log
+
+    // Check if the current user created this group
+    if (userId && group.createdBy === userId) {
+        postedByText = '<span class="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-1 rounded-full">Posted by you</span>';
+        actionButtonHtml = `
+            <button data-id="${groupId}"
+                    class="delete-button bg-red-500 text-white py-2 px-5 rounded-md shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-150 ease-in-out whitespace-nowrap">
+                Delete Group
+            </button>
+        `;
+    } else {
+        actionButtonHtml = `
+            <button data-id="${groupId}"
+                    class="join-button bg-green-500 text-white py-2 px-5 rounded-md shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-150 ease-in-out whitespace-nowrap">
+                Join Group
+            </button>
+        `;
+    }
+
     groupCard.innerHTML = `
         <div class="flex-grow">
-            <h3 class="text-xl font-semibold text-gray-800">${group.name}</h3>
+            <h3 class="text-xl font-semibold text-gray-800">${group.name} ${postedByText}</h3>
             <p class="text-gray-600 text-sm mt-1">
                 <span class="font-medium">Time:</span> ${group.time}
             </p>
             <p class="text-gray-600 text-sm">
                 <span class="font-medium">Area:</span> ${group.area}
             </p>
+            <p class="text-gray-500 text-xs mt-2">
+                <span class="font-medium">Members:</span> ${group.members ? group.members.length : 0}
+            </p>
         </div>
-        <button data-id="${groupId}"
-                class="join-button bg-green-500 text-white py-2 px-5 rounded-md shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-150 ease-in-out whitespace-nowrap">
-            Join Group
-        </button>
+        ${actionButtonHtml}
     `;
     groupsList.appendChild(groupCard);
 
-    // Add event listener to the "Join Group" button
-    groupCard.querySelector('.join-button').addEventListener('click', async (event) => {
-        const idToJoin = event.target.dataset.id;
-        await joinGroup(idToJoin);
-    });
+    // Add event listener based on the button type
+    if (userId && group.createdBy === userId) {
+        groupCard.querySelector('.delete-button').addEventListener('click', async (event) => {
+            const idToDelete = event.target.dataset.id;
+            await deleteGroup(idToDelete);
+        });
+    } else {
+        groupCard.querySelector('.join-button').addEventListener('click', async (event) => {
+            const idToJoin = event.target.dataset.id;
+            await joinGroup(idToJoin);
+        });
+    }
 }
 
 /**
@@ -280,6 +320,34 @@ async function joinGroup(groupId) {
         showModal("Error Joining Group", "Failed to join the group. Please try again.");
     }
 }
+
+/**
+ * Deletes a study group from Firestore.
+ * Only the creator should be able to delete their own groups.
+ * @param {string} groupId - The ID of the group to delete.
+ */
+async function deleteGroup(groupId) {
+    if (!userId) {
+        showModal("Authentication Required", "You must be signed in to delete a group.");
+        return;
+    }
+
+    try {
+        // Use the projectId from firebaseConfig as the appId for Firestore paths
+        const currentAppId = firebaseConfig.projectId;
+        const groupDocRef = doc(db, `artifacts/${currentAppId}/public/data/studyGroups`, groupId);
+
+        // Before attempting delete, you might want to fetch the document to verify `createdBy` matches `userId`
+        // However, the primary enforcement for this is Firestore security rules.
+        // The UI already ensures the button is only shown to the creator.
+        await deleteDoc(groupDocRef);
+        showModal("Group Deleted!", "The study group has been successfully deleted.");
+    } catch (error) {
+        console.error("Error deleting group:", error);
+        showModal("Error Deleting Group", "Failed to delete the group. You might not have permission or the group no longer exists.");
+    }
+}
+
 
 // Initialize Firebase when the window loads
 window.onload = initializeFirebase;
