@@ -1,1 +1,0 @@
-Create a tutorial group finder where people can post study groups, what time they are available and which area (library, math class, etc...), and join groups in order to attend tutorials together. Make a simple form, listing groups as if in a list.
