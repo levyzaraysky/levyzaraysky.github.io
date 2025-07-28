@@ -1,12 +1,10 @@
 // Firebase SDK Imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Global variables for Firebase config and app ID
-// IMPORTANT: When self-hosting, replace this with your actual Firebase project config.
-// The __app_id and __initial_auth_token are specific to the Canvas environment.
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Fallback for Canvas
+// IMPORTANT: REPLACE THIS firebaseConfig WITH YOUR ACTUAL PROJECT'S CONFIGURATION
+// You can find this in your Firebase Console -> Project settings -> Your apps -> Firebase SDK snippet (Config)
 const firebaseConfig = {
     apiKey: "AIzaSyDvLVp7V3J6DqKx1I2NdOnOX5XAQFJ72Dc",
     authDomain: "tutorialgroupfinder.firebaseapp.com",
@@ -16,7 +14,6 @@ const firebaseConfig = {
     appId: "1:420022612778:web:b1a16af038bced73ebe453",
     measurementId: "G-8D66P4M7DT"
 };
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; // Fallback for Canvas
 
 let app;
 let db;
@@ -93,29 +90,16 @@ async function initializeFirebase() {
                 groupsList.innerHTML = ''; // Clear groups list
                 noGroupsMessage.classList.remove('hidden'); // Show no groups message
 
-                // Attempt initial anonymous sign-in if no custom token
-                // For self-hosting, this initialAuthToken will likely be null.
-                if (!initialAuthToken) {
-                    try {
-                        await signInAnonymously(auth);
-                    } catch (error) {
-                        console.error("Anonymous sign-in failed:", error);
-                        // If anonymous sign-in also fails, display a message
-                        showModal("Authentication Required", "Please sign in with Google to use the app.");
-                    }
+                // Attempt anonymous sign-in as a fallback if no user is present
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Anonymous sign-in failed:", error);
+                    // If anonymous sign-in also fails, display a message
+                    showModal("Authentication Required", "Please sign in with Google to use the app.");
                 }
             }
         });
-
-        // Attempt custom token sign-in once at startup if token is available (Canvas specific)
-        if (initialAuthToken) {
-            try {
-                await signInWithCustomToken(auth, initialAuthToken);
-            } catch (error) {
-                console.warn("Custom token sign-in failed:", error.code, error.message);
-                // If custom token fails, onAuthStateChanged will handle anonymous sign-in or prompt for Google.
-            }
-        }
 
     } catch (error) {
         console.error("Error initializing Firebase:", error);
