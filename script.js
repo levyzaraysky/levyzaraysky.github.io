@@ -3,8 +3,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// IMPORTANT: REPLACE THIS firebaseConfig WITH YOUR ACTUAL PROJECT'S CONFIGURATION
-// You can find this in your Firebase Console -> Project settings -> Your apps -> Firebase SDK snippet (Config)
 const firebaseConfig = {
     apiKey: "AIzaSyDvLVp7V3J6DqKx1I2NdOnOX5XAQFJ72Dc",
     authDomain: "tutorialgroupfinder.firebaseapp.com",
@@ -57,6 +55,7 @@ async function initializeFirebase() {
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
+        console.log("Firebase Auth initialized:", auth); // Debugging log
 
         // Listen for authentication state changes
         onAuthStateChanged(auth, async (user) => {
@@ -92,6 +91,7 @@ async function initializeFirebase() {
 
                 // Attempt anonymous sign-in as a fallback if no user is present
                 try {
+                    console.log("Attempting anonymous sign-in...");
                     await signInAnonymously(auth);
                 } catch (error) {
                     console.error("Anonymous sign-in failed:", error);
@@ -111,8 +111,16 @@ async function initializeFirebase() {
  * Handles Google Sign-In using a popup.
  */
 googleSignInButton.addEventListener('click', async () => {
+    console.log("Google Sign-In button clicked."); // Debugging log
+    if (!auth) {
+        console.error("Firebase Auth object is not initialized."); // Debugging log
+        showModal("Error", "Firebase authentication is not ready. Please try again.");
+        return;
+    }
+
     const provider = new GoogleAuthProvider();
     try {
+        console.log("Calling signInWithPopup..."); // Debugging log
         await signInWithPopup(auth, provider);
         // The onAuthStateChanged listener will handle updating the UI
     } catch (error) {
@@ -122,6 +130,8 @@ googleSignInButton.addEventListener('click', async () => {
             errorMessage = "Google Sign-In window was closed. Please try again.";
         } else if (error.code === 'auth/cancelled-popup-request') {
             errorMessage = "Another sign-in popup was already open. Please complete or close it.";
+        } else if (error.code === 'auth/network-request-failed') {
+            errorMessage = "Network error during sign-in. Check your internet connection.";
         }
         showModal("Google Sign-In Error", errorMessage);
     }
@@ -189,9 +199,6 @@ function createGroupCard(group, groupId) {
             </p>
             <p class="text-gray-600 text-sm">
                 <span class="font-medium">Area:</span> ${group.area}
-            </p>
-            <p class="text-gray-500 text-xs mt-2">
-                <span class="font-medium">Members:</span> ${group.members ? group.members.length : 0}
             </p>
         </div>
         <button data-id="${groupId}"
