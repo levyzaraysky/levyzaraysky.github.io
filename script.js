@@ -207,7 +207,7 @@ function createGroupCard(group, groupId) {
     console.log(`  Is creator? ${userId && group.createdBy === userId}`); // Debugging log
 
     // Check if the current user created this group
-    if (userId && group.createdBy === userId) {
+    if (userId && group.createdBy == userId) {
         postedByText = '<span class="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-1 rounded-full">Posted by you</span>';
         actionButtonHtml = `
             <button data-id="${groupId}"
