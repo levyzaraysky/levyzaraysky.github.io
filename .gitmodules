@@ -1,0 +1,3 @@
+[submodule "mathcraft"]
+	path = mathcraft
+	url = https://github.com/levyzaraysky/mathcraft
